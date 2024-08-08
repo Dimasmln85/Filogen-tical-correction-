@@ -1,0 +1,80 @@
+rary(readxl)
+library(ape)
+library(phytools)
+library(phangorn)
+library(picante)
+library(SYNCSA)
+library(geiger)
+library(brms)
+library(vcd)
+
+# Load tree
+arb <- read.nexus("birdtree_diezmil.txt")
+# Load data
+data <- read_excel("New_data/Listado_individuos.xlsx")
+# Check if the tree is rooted
+is.rooted(arb)
+# Create a consensus tree
+tree <- consensus(arb, p = 0.95, rooted = TRUE)
+# Constructing phylogenetic tree
+comparison <- name.check(tree, data, data.names = data$PhyloMaster_scientificName)
+comparison
+comparison$data_not_tree
+pruned.tree <- drop.tip(tree, comparison$tree_not_data)
+# Calculate branch lengths
+pruned.tree <- compute.brlen(pruned.tree)
+# Calculate covariance matrix
+tree_vcv <- vcv.phylo(pruned.tree)
+# Convert date to radians
+data$year_capture <- as.Date(data$year_capture, format = "%Y-%m-%d")
+data$day <- as.numeric(format(data$year_capture, "%j"))
+data$day_capture_r <- (data$day / 365) * (2 * 3.1416)
+selected_columns <- data[, c("Ln_weight", "day_capture_r", "elevation")]
+# Compute the correlation matrix
+cor_matrix <- cor(selected_columns, use = "complete.obs")
+print(cor_matrix)
+# Convert categorical variables to factors and relevel
+data$TypeHabitat_c <- as.factor(data$TypeHabitat)
+data$Natural <- relevel(data$TypeHabitat_c, ref = "Natural")
+data$estatus <- as.factor(data$estatus)
+data$Migratory <- relevel(data$estatus, ref = "Migratory")
+data$Reproductive_Condition_2 <- as.factor(data$Reproductive_Condition_2)
+data$Reproductive <- relevel(data$Reproductive_Condition_2, ref = "Reproductive")
+data$forageStratum <- as.factor(data$forageStratum)
+data$Understory <- relevel(data$forageStratum, ref = "Understory")
+data$foragingStrategy <- as.factor(data$foragingStrategy)
+data$Searcher <- relevel(data$foragingStrategy, ref = "Searcher")
+data$sociability <- as.factor(data$sociability)
+data$Gregarious <- relevel(data$sociability, ref = "Gregarious")
+data$region <- as.factor(data$region)
+data$Savanna <- relevel(data$region, ref = "Savanna")
+data$elevation_2 <- as.factor(data$elevation_2)
+data$TL <- relevel(data$elevation_2, ref = "TL")
+# Define priors for models
+my_prior <- set_prior("normal(0, 1)", class = "b")
+# Model 1: Binary response variable Ticks
+my_formula1 <- bf(Ticks ~ Natural + Migratory + Reproductive + Understory + Searcher + Gregarious + Ln_weight + day_capture_r + TL + (1 | gr(PhyloMaster_scientificName, cov = tree_vcv)), family = bernoulli())
+model1 <- brm(my_formula1, data = data, family = bernoulli(), chains = 4, cores = 4, iter = 13000, warmup = 2000, control = list(adapt_delta = 0.99, max_treedepth = 12), data2 = list(tree_vcv = tree_vcv), prior = my_prior)
+summary(model1)
+# Model 2: Binary response variable Amblyomma
+my_formula2 <- bf(Amblyomma ~ Natural + Migratory + Reproductive + Understory + Searcher + Gregarious + Ln_weight + day_capture_r + TL + (1 | gr(PhyloMaster_scientificName, cov = tree_vcv)), family = bernoulli())
+model2 <- brm(my_formula2, data = data, family = bernoulli(), chains = 4, cores = 4, iter = 13000, warmup = 2000, control = list(adapt_delta = 0.99, max_treedepth = 12), data2 = list(tree_vcv = tree_vcv), prior = my_prior)
+summary(model2)
+plot(model2)
+# Model 3: Binary response variable Amblyomma_inmature
+my_formula3 <- bf(Amblyomma_inmature ~ Natural + Migratory + Reproductive + Understory + Searcher + Gregarious + Ln_weight + day_capture_r + TL + (1 | gr(PhyloMaster_scientificName, cov = tree_vcv)), family = bernoulli())
+model3 <- brm(my_formula3, data = data, family = bernoulli(), chains = 4, cores = 4, iter = 13000, warmup = 2000, control = list(adapt_delta = 0.99, max_treedepth = 12), data2 = list(tree_vcv = tree_vcv), prior = my_prior)
+summary(model3)
+plot(model3)
+# Model 4: Binary response variable Nymph
+my_formula4 <- bf(Nymph ~ Natural + Migratory + Reproductive + Understory + Searcher + Gregarious + Ln_weight + day_capture_r + TL + (1 | gr(PhyloMaster_scientificName, cov = tree_vcv)), family = bernoulli())
+model4 <- brm(my_formula4, data = data, family = bernoulli(), chains = 4, cores = 4, iter = 13000, warmup = 2000, control = list(adapt_delta = 0.99, max_treedepth = 12), data2 = list(tree_vcv = tree_vcv), prior = my_prior)
+summary(model4)
+plot(model4)
+# Model 5: Binary response variable Tick_inmature
+my_formula5 <- bf(Tick_inmature ~ Natural + Migratory + Reproductive + Understory + Searcher + Gregarious + Ln_weight + day_capture_r + TL + (1 | gr(PhyloMaster_scientificName, cov = tree_vcv)), family = bernoulli())
+model5 <- brm(my_formula5, data = data, family = bernoulli(), chains = 4, cores = 4, iter = 15000, warmup = 2000, control = list(adapt_delta = 0.99, max_treedepth = 12), data2 = list(tree_vcv = tree_vcv), prior = my_prior)
+summary(model5)
+plot(model5)
+# Model 6: Binary response variable General_larve
+my_formula6 <- bf(General_larve ~ Natural + Migratory + Reproductive + Understory + Searcher + Gregarious + Ln_weight + day_capture_r + TL + (1 | 
